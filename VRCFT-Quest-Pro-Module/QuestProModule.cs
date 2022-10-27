@@ -10,7 +10,7 @@ namespace VRCFT_Quest_Pro_Module
 {
     public class QuestProModule : ExtTrackingModule
     {
-        public int listenPort = 10000;
+        public int listenPort = 13191;
 
         private UdpClient listener;
         private IPEndPoint groupEP;

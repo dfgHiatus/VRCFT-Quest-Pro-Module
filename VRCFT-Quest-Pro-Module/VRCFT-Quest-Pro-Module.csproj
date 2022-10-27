@@ -8,7 +8,7 @@
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>VRCFT_Quest_Pro_Module</RootNamespace>
-    <AssemblyName>VRCFT-Quest-Pro-Module</AssemblyName>
+    <AssemblyName>VRCFTQuestProModule</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>

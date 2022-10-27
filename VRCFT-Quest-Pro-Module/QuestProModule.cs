@@ -12,7 +12,8 @@ namespace VRCFT_Quest_Pro_Module
 
         private UdpClient listener;
         private IPEndPoint groupEP;
-        private float[] expressions = new float[63 * 4];
+        private const int expressionsSize = 63 * 4;
+        private float[] expressions = new float[expressionsSize];
         
         public override (bool SupportsEye, bool SupportsLip) Supported => (true, true);
         
@@ -41,7 +42,7 @@ namespace VRCFT_Quest_Pro_Module
             {
                 // We start by receiving the data from the UDP listener.
                 // The data is a byte array 63*4 bytes long, since floats are 32 bits long
-                Buffer.BlockCopy(listener.Receive(ref groupEP), 0, expressions, 0, 63 * 4);
+                Buffer.BlockCopy(listener.Receive(ref groupEP), 0, expressions, 0, expressionsSize);
 
                 // Usage:
                 // expressions[FBExpression.Cheek_Suck_L]

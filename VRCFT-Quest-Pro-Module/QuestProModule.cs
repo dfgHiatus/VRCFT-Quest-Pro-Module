@@ -10,19 +10,39 @@ namespace VRCFT_Quest_Pro_Module
 {
     public class QuestProModule : ExtTrackingModule
     {
-        public int listenPort = 13191;
-
-        private UdpClient listener;
-        private IPEndPoint groupEP;
+        public IPAddress localAddr = IPAddress.Parse("127.0.0.1");
+        public int port = 13191;
+        
+        private TcpListener server;
+        private TcpClient client;
+        private NetworkStream stream;
+        
         private const int expressionsSize = 63 * 4;
+        private byte[] rawExpressions = new byte[expressionsSize];
         private float[] expressions = new float[expressionsSize];
 
         public override (bool SupportsEye, bool SupportsLip) Supported => (true, true);
         
         public override (bool eyeSuccess, bool lipSuccess) Initialize(bool eye, bool lip)
-        {
-            listener = new UdpClient(listenPort);
-            groupEP = new IPEndPoint(IPAddress.Any, listenPort);
+        {           
+            server = new TcpListener(localAddr, port);
+            server.Start();
+
+            client = server.AcceptTcpClient(); // Blocks indefintely until a connection is made
+            if (client == null)
+            {
+                Logger.Error("Failed to connect to client");
+                return (false, false);
+            }
+
+            stream = client.GetStream();
+            if (stream == null)
+            {
+                Logger.Error("Failed to get stream");
+                return (false, false);
+            }
+
+            Logger.Msg("Connected to client and stream!");
             return (true, true);
         }
         
@@ -42,9 +62,16 @@ namespace VRCFT_Quest_Pro_Module
         {
             try
             {
-                // We receive information from the UDP listener as a byte array 63*4 bytes long, since floats are 32 bits long and we have 63 expressions.
+                if (!stream.CanRead)
+                    return;
+
+                // Read from the stream. If there is nothing to read, return
+                if (stream.Read(rawExpressions, 0, expressionsSize) != 0)
+                    return;
+
+                // We receive information from the stream as a byte array 63*4 bytes long, since floats are 32 bits long and we have 63 expressions.
                 // We then need to convert this byte array to a float array. Thankfully, this can all be done in a single line of code.
-                Buffer.BlockCopy(listener.Receive(ref groupEP), 0, expressions, 0, expressionsSize);
+                Buffer.BlockCopy(rawExpressions, 0, expressions, 0, expressionsSize);
                 
                 UpdateExpressions();
             }
@@ -54,10 +81,10 @@ namespace VRCFT_Quest_Pro_Module
             }
         }
 
-
         public override void Teardown()
         {
-            listener.Close();
+            client.Close();
+            server.Stop();
         }
 
         // Thank you @adjerry on the VRCFT discord for these conversions! https://docs.google.com/spreadsheets/d/118jo960co3Mgw8eREFVBsaJ7z0GtKNr52IB4Bz99VTA/edit#gid=0

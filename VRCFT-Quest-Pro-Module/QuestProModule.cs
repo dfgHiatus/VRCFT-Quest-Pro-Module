@@ -9,15 +9,13 @@ using ViveSR.anipal.Lip;
 using VRCFaceTracking;
 using VRCFaceTracking.Params;
 
-
 namespace VRCFT_Quest_Pro_Module
 {
     public class QuestProModule : ExtTrackingModule
     {
-        public IPAddress localAddr; // = IPAddress.Parse("192.168.1.163");
-        public int port; // = 13191;
+        public IPAddress localAddr;
+        public int port;
         
-        // private TcpListener server;
         private TcpClient client;
         private NetworkStream stream;
         
@@ -35,7 +33,7 @@ namespace VRCFT_Quest_Pro_Module
             {
                 string json = File.ReadAllText(configPath);
                 var config = JsonConvert.DeserializeObject<Config>(json);
-                localAddr = config.IP;
+                localAddr = IPAddress.Parse(config.IP);
                 port = config.Port;
             }
             else
@@ -44,25 +42,33 @@ namespace VRCFT_Quest_Pro_Module
                 return (false, false);
             }
 
-            // server = new TcpListener(localAddr, port);
-            // server.Start();
-            // client = server.AcceptTcpClient(); // Blocks indefintely until a connection is made
+            client = new TcpClient(new IPEndPoint(IPAddress.Any, port));
+            int attempt = 0;
+            int maxTries = 10;
 
-            client = new TcpClient(new IPEndPoint(localAddr, port));
-            if (client == null)
+            Logger.Msg($"Trying to establish a Quest Pro connection at {localAddr}:{port}...");
+            for (attempt = 0; attempt < maxTries; attempt++)
             {
-                Logger.Error("Failed to connect to client");
-                return (false, false);
+                if (!client.Connected)
+                {
+                    Logger.Msg($"Attempt {attempt + 1}/10");
+                    Thread.Sleep(2000);
+                }
+                else
+                {
+                    Logger.Msg("Connected to Quest Pro via TCP!");
+                    break;
+                }
             }
 
+            if (attempt == maxTries)
+            {
+                Logger.Error("Could not establish connection to Quest Pro!");
+                return (false, false);
+            }  
+            
             stream = client.GetStream();
-            if (stream == null)
-            {
-                Logger.Error("Failed to get stream");
-                return (false, false);
-            }
-
-            Logger.Msg("Connected to client and stream!");
+            Logger.Msg("ALXR handshake successful! Data will be broadcast to VRCFaceTracking.");
             return (true, true);
         }
         

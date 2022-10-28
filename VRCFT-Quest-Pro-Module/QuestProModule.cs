@@ -12,10 +12,10 @@ namespace VRCFT_Quest_Pro_Module
 {
     public class QuestProModule : ExtTrackingModule
     {
-        public IPAddress localAddr = IPAddress.Parse("127.0.0.1");
+        public IPAddress localAddr = IPAddress.Parse("192.168.1.163");
         public int port = 13191;
         
-        private TcpListener server;
+        // private TcpListener server;
         private TcpClient client;
         private NetworkStream stream;
         
@@ -27,10 +27,11 @@ namespace VRCFT_Quest_Pro_Module
         
         public override (bool eyeSuccess, bool lipSuccess) Initialize(bool eye, bool lip)
         {           
-            server = new TcpListener(localAddr, port);
-            server.Start();
+            // server = new TcpListener(localAddr, port);
+            // server.Start();
+            // client = server.AcceptTcpClient(); // Blocks indefintely until a connection is made
 
-            client = server.AcceptTcpClient(); // Blocks indefintely until a connection is made
+            client = new TcpClient(new IPEndPoint(localAddr, port));
             if (client == null)
             {
                 Logger.Error("Failed to connect to client");
@@ -89,7 +90,7 @@ namespace VRCFT_Quest_Pro_Module
             stream.Dispose();
             client.Close();
             client.Dispose();
-            server.Stop();
+            // server.Stop();
         }
 
         // Thank you @adjerry on the VRCFT discord for these conversions! https://docs.google.com/spreadsheets/d/118jo960co3Mgw8eREFVBsaJ7z0GtKNr52IB4Bz99VTA/edit#gid=0

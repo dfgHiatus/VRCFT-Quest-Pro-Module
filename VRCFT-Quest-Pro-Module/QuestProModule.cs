@@ -1,19 +1,21 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
+using System.Reflection;
 using ViveSR.anipal.Lip;
 using VRCFaceTracking;
 using VRCFaceTracking.Params;
+
 
 namespace VRCFT_Quest_Pro_Module
 {
     public class QuestProModule : ExtTrackingModule
     {
-        public IPAddress localAddr = IPAddress.Parse("192.168.1.163");
-        public int port = 13191;
+        public IPAddress localAddr; // = IPAddress.Parse("192.168.1.163");
+        public int port; // = 13191;
         
         // private TcpListener server;
         private TcpClient client;
@@ -26,7 +28,22 @@ namespace VRCFT_Quest_Pro_Module
         public override (bool SupportsEye, bool SupportsLip) Supported => (true, true);
         
         public override (bool eyeSuccess, bool lipSuccess) Initialize(bool eye, bool lip)
-        {           
+        {
+            // Open the config file in the same directory called config.json
+            string configPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "config.json");
+            if (File.Exists(configPath))
+            {
+                string json = File.ReadAllText(configPath);
+                var config = JsonConvert.DeserializeObject<Config>(json);
+                localAddr = config.IP;
+                port = config.Port;
+            }
+            else
+            {
+                Logger.Error("Failed to find config JSON! Please maker sure it is present in the same directory as the DLL.");
+                return (false, false);
+            }
+
             // server = new TcpListener(localAddr, port);
             // server.Start();
             // client = server.AcceptTcpClient(); // Blocks indefintely until a connection is made

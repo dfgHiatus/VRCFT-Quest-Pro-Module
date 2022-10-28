@@ -42,31 +42,11 @@ namespace VRCFT_Quest_Pro_Module
                 return (false, false);
             }
 
-            client = new TcpClient(new IPEndPoint(IPAddress.Any, port));
-            int attempt = 0;
-            int maxTries = 10;
-
             Logger.Msg($"Trying to establish a Quest Pro connection at {localAddr}:{port}...");
-            for (attempt = 0; attempt < maxTries; attempt++)
-            {
-                if (!client.Connected)
-                {
-                    Logger.Msg($"Attempt {attempt + 1}/10");
-                    Thread.Sleep(2000);
-                }
-                else
-                {
-                    Logger.Msg("Connected to Quest Pro via TCP!");
-                    break;
-                }
-            }
+            client = new TcpClient();
+            client.Connect(localAddr, port);
+            Logger.Error("Connected to Quest Pro!");
 
-            if (attempt == maxTries)
-            {
-                Logger.Error("Could not establish connection to Quest Pro!");
-                return (false, false);
-            }  
-            
             stream = client.GetStream();
             Logger.Msg("ALXR handshake successful! Data will be broadcast to VRCFaceTracking.");
             return (true, true);

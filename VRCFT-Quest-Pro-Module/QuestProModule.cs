@@ -1,6 +1,8 @@
 ﻿using System;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
 using ViveSR.anipal.Lip;
 using VRCFaceTracking;
@@ -83,7 +85,10 @@ namespace VRCFT_Quest_Pro_Module
 
         public override void Teardown()
         {
+            stream.Close();
+            stream.Dispose();
             client.Close();
+            client.Dispose();
             server.Stop();
         }
 

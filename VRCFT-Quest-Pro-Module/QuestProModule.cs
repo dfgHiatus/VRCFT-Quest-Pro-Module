@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -8,48 +7,68 @@ using System.Reflection;
 using ViveSR.anipal.Lip;
 using VRCFaceTracking;
 using VRCFaceTracking.Params;
+using System.Linq.Expressions;
 
 namespace VRCFT_Quest_Pro_Module
 {
     public class QuestProModule : ExtTrackingModule
     {
         public IPAddress localAddr;
-        public int port;
+        public int PORT = 13191;
         
         private TcpClient client;
         private NetworkStream stream;
+        private bool connected = false;
         
-        private const int expressionsSize = 63 * 4;
-        private byte[] rawExpressions = new byte[expressionsSize];
+        private const int expressionsSize = 63; 
+        private byte[] rawExpressions = new byte[expressionsSize * 4];
         private float[] expressions = new float[expressionsSize];
 
         public override (bool SupportsEye, bool SupportsLip) Supported => (true, true);
         
         public override (bool eyeSuccess, bool lipSuccess) Initialize(bool eye, bool lip)
         {
-            // Open the config file in the same directory called config.json
-            string configPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "config.json");
-            if (File.Exists(configPath))
+            string configPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "questProIP.txt");
+            if (!File.Exists(configPath))
             {
-                string json = File.ReadAllText(configPath);
-                var config = JsonConvert.DeserializeObject<Config>(json);
-                localAddr = IPAddress.Parse(config.IP);
-                port = config.Port;
-            }
-            else
-            {
-                Logger.Error("Failed to find config JSON! Please maker sure it is present in the same directory as the DLL.");
+                Logger.Msg("Failed to find config JSON! Please maker sure it is present in the same directory as the DLL.");
                 return (false, false);
             }
+            
+            string text = File.ReadAllText(configPath).Trim();
+                
+            if (!IPAddress.TryParse(text, out localAddr))
+            {
+                Logger.Error("The IP provided in questProIP.txt is not valid. Please check the file and try again.");
+                return (false, false);  
+            }
+            
+            ConnectToTCP();
 
-            Logger.Msg($"Trying to establish a Quest Pro connection at {localAddr}:{port}...");
-            client = new TcpClient();
-            client.Connect(localAddr, port);
-            Logger.Error("Connected to Quest Pro!");
-
-            stream = client.GetStream();
             Logger.Msg("ALXR handshake successful! Data will be broadcast to VRCFaceTracking.");
             return (true, true);
+        }
+
+        private bool ConnectToTCP()
+        {
+            try
+            {
+                client = new TcpClient();
+                Logger.Msg($"Trying to establish a Quest Pro connection at {localAddr}:{PORT}...");
+
+                client.Connect(localAddr, PORT);
+                Logger.Msg("Connected to Quest Pro!");
+
+                stream = client.GetStream();
+                connected = true;
+                
+                return true;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e.Message);
+                return false;
+            }
         }
         
         public override Action GetUpdateThreadFunc()
@@ -68,34 +87,79 @@ namespace VRCFT_Quest_Pro_Module
         {
             try
             {
-                if (!stream.CanRead)
-                    return;
+                // Attempt reconnection if needed
+                if (!connected || stream == null)
+                {
+                    ConnectToTCP();
+                }
 
-                // Read from the stream. If there is nothing to read, return
-                if (stream.Read(rawExpressions, 0, expressionsSize) != 0)
+                if (stream == null)
+                {
+                    Logger.Warning("Can't read from network stream just yet! Trying again soon...");
                     return;
+                }
+
+                if (!stream.CanRead)
+                {
+                    Logger.Warning("Can't read from network stream just yet! Trying again soon...");
+                    return;
+                }
+
+                int offset = 0;
+                int readBytes;
+                do
+                {
+                    readBytes = stream.Read(rawExpressions, offset, rawExpressions.Length - offset);
+                    offset += readBytes;
+                } 
+                while (readBytes > 0 && offset < rawExpressions.Length);
+
+                if (offset < rawExpressions.Length)
+                {
+                    // TODO Reconnect to the server if we lose connection
+                    Logger.Warning("End of stream! Reconnecting...");
+                    connected = false;
+                    try
+                    {
+                        stream.Close();
+                    }
+                    catch (SocketException e) 
+                    {
+                        Logger.Error(e.Message);
+                        Thread.Sleep(1000);
+                    }
+                }
 
                 // We receive information from the stream as a byte array 63*4 bytes long, since floats are 32 bits long and we have 63 expressions.
                 // We then need to convert this byte array to a float array. Thankfully, this can all be done in a single line of code.
-                Buffer.BlockCopy(rawExpressions, 0, expressions, 0, expressionsSize);
-                
+                Buffer.BlockCopy(rawExpressions, 0, expressions, 0, expressionsSize * 4);
+
+                PrepareUpdate();
                 UpdateExpressions();
             }
             catch (SocketException e)
             {
                 Logger.Error(e.Message);
+                Thread.Sleep(1000);
             }
         }
 
-        public override void Teardown()
+
+        // Preprocess our expressions per the Meta Documentation
+        private void PrepareUpdate()
         {
-            stream.Close();
-            stream.Dispose();
-            client.Close();
-            client.Dispose();
-            // server.Stop();
+            expressions[FBExpression.Eyes_Closed_L] = 1 -
+                (expressions[FBExpression.Eyes_Look_Down_L] +
+                    Math.Min(expressions[FBExpression.Eyes_Look_Down_L],
+                    expressions[FBExpression.Eyes_Look_Down_R]));
+
+            expressions[FBExpression.Eyes_Closed_R] = 1 -
+                (expressions[FBExpression.Eyes_Look_Down_R] +
+                    Math.Min(expressions[FBExpression.Eyes_Look_Down_L],
+                    expressions[FBExpression.Eyes_Look_Down_R]));
         }
 
+        // TODO: Open PR for raw FB facial expression data
         // Thank you @adjerry on the VRCFT discord for these conversions! https://docs.google.com/spreadsheets/d/118jo960co3Mgw8eREFVBsaJ7z0GtKNr52IB4Bz99VTA/edit#gid=0
         private void UpdateExpressions()
         {
@@ -185,6 +249,13 @@ namespace VRCFT_Quest_Pro_Module
                 Squeeze = Squeeze,
                 Widen = Widen
             };
+        }
+        public override void Teardown()
+        {
+            stream.Close();
+            stream.Dispose();
+            client.Close();
+            client.Dispose();
         }
     }
 }

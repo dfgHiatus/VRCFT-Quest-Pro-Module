@@ -54,7 +54,7 @@
     <Reference Include="System.Xml" />
     <Reference Include="VRCFaceTracking, Version=3.0.1.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>.\VRCFaceTracking.exe</HintPath>
+      <HintPath>C:\Users\BenjaminEvans\source\repos\VRCFaceTracking\VRCFaceTracking\bin\Debug\VRCFaceTracking.exe</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -62,9 +62,6 @@
     <Compile Include="QuestProModule.cs" />
     <Compile Include="FBExpression.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="VRCFaceTracking.exe" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

@@ -2,12 +2,11 @@
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading;
 using System.Reflection;
+using System.Threading;
 using ViveSR.anipal.Lip;
 using VRCFaceTracking;
 using VRCFaceTracking.Params;
-using System.Linq.Expressions;
 
 namespace VRCFT_Quest_Pro_Module
 {
@@ -25,7 +24,7 @@ namespace VRCFT_Quest_Pro_Module
         private float[] expressions = new float[expressionsSize];
 
         public override (bool SupportsEye, bool SupportsLip) Supported => (true, true);
-        
+
         public override (bool eyeSuccess, bool lipSuccess) Initialize(bool eye, bool lip)
         {
             string configPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "questProIP.txt");
@@ -34,15 +33,15 @@ namespace VRCFT_Quest_Pro_Module
                 Logger.Msg("Failed to find config JSON! Please maker sure it is present in the same directory as the DLL.");
                 return (false, false);
             }
-            
+
             string text = File.ReadAllText(configPath).Trim();
-                
+
             if (!IPAddress.TryParse(text, out localAddr))
             {
                 Logger.Error("The IP provided in questProIP.txt is not valid. Please check the file and try again.");
-                return (false, false);  
+                return (false, false);
             }
-            
+
             ConnectToTCP();
 
             Logger.Msg("ALXR handshake successful! Data will be broadcast to VRCFaceTracking.");
@@ -61,7 +60,7 @@ namespace VRCFT_Quest_Pro_Module
 
                 stream = client.GetStream();
                 connected = true;
-                
+
                 return true;
             }
             catch (Exception e)
@@ -70,7 +69,7 @@ namespace VRCFT_Quest_Pro_Module
                 return false;
             }
         }
-        
+
         public override Action GetUpdateThreadFunc()
         {
             return () =>
@@ -78,7 +77,7 @@ namespace VRCFT_Quest_Pro_Module
                 while (true)
                 {
                     Update();
-                    Thread.Sleep(10);
+                    // Thread.Sleep(10); Blocked by IO, no need to sleep
                 }
             };
         }
@@ -93,9 +92,10 @@ namespace VRCFT_Quest_Pro_Module
                     ConnectToTCP();
                 }
 
+                // If we fail to reconnect, try again
                 if (stream == null)
                 {
-                    Logger.Warning("Can't read from network stream just yet! Trying again soon...");
+                    Logger.Warning("No network stream was found! Trying to reconnect...");
                     return;
                 }
 
@@ -116,7 +116,7 @@ namespace VRCFT_Quest_Pro_Module
 
                 if (offset < rawExpressions.Length)
                 {
-                    // TODO Reconnect to the server if we lose connection
+                    // Reconnect to the server if we lose connection
                     Logger.Warning("End of stream! Reconnecting...");
                     connected = false;
                     try
@@ -137,7 +137,7 @@ namespace VRCFT_Quest_Pro_Module
                 PrepareUpdate();
                 UpdateExpressions();
             }
-            catch (SocketException e)
+            catch (Exception e)
             {
                 Logger.Error(e.Message);
                 Thread.Sleep(1000);
@@ -148,15 +148,15 @@ namespace VRCFT_Quest_Pro_Module
         // Preprocess our expressions per the Meta Documentation
         private void PrepareUpdate()
         {
-            expressions[FBExpression.Eyes_Closed_L] = 1 -
+            expressions[FBExpression.Eyes_Closed_L] = 0.9f - ((
                 (expressions[FBExpression.Eyes_Look_Down_L] +
                     Math.Min(expressions[FBExpression.Eyes_Look_Down_L],
-                    expressions[FBExpression.Eyes_Look_Down_R]));
+                    expressions[FBExpression.Eyes_Look_Down_R]))) * 3);
 
-            expressions[FBExpression.Eyes_Closed_R] = 1 -
+            expressions[FBExpression.Eyes_Closed_R] = 0.9f - ((
                 (expressions[FBExpression.Eyes_Look_Down_R] +
                     Math.Min(expressions[FBExpression.Eyes_Look_Down_L],
-                    expressions[FBExpression.Eyes_Look_Down_R]));
+                    expressions[FBExpression.Eyes_Look_Down_R]))) * 3);
         }
 
         // TODO: Open PR for raw FB facial expression data
@@ -244,12 +244,13 @@ namespace VRCFT_Quest_Pro_Module
         {
             return new Eye()
             {
-                Look = new Vector2(LookLeft + LookRight, LookUp + LookDown),
+                Look = new Vector2(LookRight - LookLeft, LookUp - LookDown),
                 Openness = Openness,
                 Squeeze = Squeeze,
                 Widen = Widen
             };
         }
+        
         public override void Teardown()
         {
             stream.Close();

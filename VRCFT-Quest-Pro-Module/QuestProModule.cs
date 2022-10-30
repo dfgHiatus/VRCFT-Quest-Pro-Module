@@ -53,11 +53,12 @@ namespace VRCFT_Quest_Pro_Module
             try
             {
                 client = new TcpClient();
+                // client.NoDelay = true; // <= Here, also https://learn.microsoft.com/en-us/troubleshoot/windows-server/networking/tcpip-performance-known-issues
                 Logger.Msg($"Trying to establish a Quest Pro connection at {localAddr}:{PORT}...");
 
                 client.Connect(localAddr, PORT);
                 Logger.Msg("Connected to Quest Pro!");
-
+                
                 stream = client.GetStream();
                 connected = true;
 
@@ -109,6 +110,7 @@ namespace VRCFT_Quest_Pro_Module
                 int readBytes;
                 do
                 {
+                    // readBytes = stream.ReadAsync(rawExpressions, offset, rawExpressions.Length - offset).Result; // No hanging?
                     readBytes = stream.Read(rawExpressions, offset, rawExpressions.Length - offset);
                     offset += readBytes;
                 } 
